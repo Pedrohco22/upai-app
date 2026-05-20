@@ -1,0 +1,11 @@
+# Ignora node_modules local
+node_modules
+
+# Ignora build local
+.next
+
+# Ignora variáveis locais
+.env.local
+
+# Ignora git
+.git

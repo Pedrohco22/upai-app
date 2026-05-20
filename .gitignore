@@ -1,0 +1,15 @@
+# Node
+node_modules
+
+# Next
+.next
+
+# Env
+.env.local
+.env.production
+
+# Uploads
+public/uploads
+
+# Logs
+public/uploads
