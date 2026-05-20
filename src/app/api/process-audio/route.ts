@@ -91,7 +91,7 @@ export async function POST(request: Request) {
     // COMANDO FFMPEG
     // =====================================================
 
-    const command = `ffmpeg -y -i "${absolutePath}" -vn -acodec libmp3lame "${outputPath}"`;
+    const command = `ffmpeg -y -i "${absolutePath}" -t 60 -vn -acodec libmp3lame "${outputPath}"`;
 
     // =====================================================
     // EXECUTA FFMPEG
