@@ -29,7 +29,7 @@ export async function POST(request: Request) {
     const body = await request.json();
 
     // Extrai os dados recebidos
-    const { inputPath, start, end, title, videoId } = body;
+    const { inputPath, start, end, title, videoId, reason } = body;
 
     // Calcula a duração do corte
     const duration = end - start;
@@ -64,9 +64,10 @@ const result = await db.query(
     file_path,
     start_time,
     end_time,
-    duration
+    duration,
+    reason
   )
-  VALUES ($1, $2, $3, $4, $5, $6)
+  VALUES ($1, $2, $3, $4, $5, $6, $7)
   RETURNING *
   `,
   [
@@ -76,6 +77,7 @@ const result = await db.query(
     start,
     end,
     duration,
+    reason
   ]
 );
 
