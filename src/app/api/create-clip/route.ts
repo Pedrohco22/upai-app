@@ -13,6 +13,9 @@ import { exec } from "child_process";
 // Importa promisify para usar exec com async/await
 import { promisify } from "util";
 
+// Importa conexão PostgreSQL
+import { db } from "@/lib/db";
+
 // Transforma exec em uma função baseada em Promise
 const execAsync = promisify(exec);
 
@@ -26,7 +29,7 @@ export async function POST(request: Request) {
     const body = await request.json();
 
     // Extrai os dados recebidos
-    const { inputPath, start, end, title } = body;
+    const { inputPath, start, end, title, videoId } = body;
 
     // Calcula a duração do corte
     const duration = end - start;
@@ -52,15 +55,35 @@ export async function POST(request: Request) {
     // Executa o FFmpeg
     await execAsync(command);
 
+    // Salva informações do corte no PostgreSQL
+const result = await db.query(
+  `
+  INSERT INTO clips (
+    video_id,
+    title,
+    file_path,
+    start_time,
+    end_time,
+    duration
+  )
+  VALUES ($1, $2, $3, $4, $5, $6)
+  RETURNING *
+  `,
+  [
+    videoId,
+    title,
+    `/clips/${clipName}`,
+    start,
+    end,
+    duration,
+  ]
+);
+
     // Retorna o caminho público do corte gerado
     return Response.json({
-      success: true,
-      title,
-      start,
-      end,
-      duration,
-      clipPath: `/clips/${clipName}`,
-    });
+  success: true,
+  clip: result.rows[0],
+});
   } catch (error) {
     // Mostra o erro no log do container
     console.error("Erro ao gerar clip:", error);
