@@ -15,7 +15,7 @@ export const runtime = "nodejs";
 
 // URL do webhook do n8n que vai processar o vídeo após o upload
 const N8N_PROCESS_VIDEO_WEBHOOK =
-  "https://phco.duckdns.org/webhook/upai-process-video";
+  "https://n8n:5678/webhook/upai-process-video";
 
 // Rota POST para receber upload de vídeo
 export async function POST(request: Request) {
