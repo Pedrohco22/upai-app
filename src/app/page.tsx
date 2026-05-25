@@ -3,7 +3,15 @@
 // Importa hooks do React
 import { useEffect, useState } from "react";
 
-// Tipo de um clip retornado pela API
+// Tipo de vídeo retornado pela API
+type Video = {
+  id: string;
+  original_file_name: string;
+  original_file_path: string;
+  status: string;
+};
+
+// Tipo de clip retornado pela API
 type Clip = {
   id: string;
   title: string;
@@ -15,7 +23,10 @@ type Clip = {
 
 // Componente principal da página
 export default function HomePage() {
-  // Estado que armazena os clips
+  // Estado que armazena os vídeos enviados
+  const [videos, setVideos] = useState<Video[]>([]);
+
+  // Estado que armazena os clips gerados
   const [clips, setClips] = useState<Clip[]>([]);
 
   // Estado que armazena o arquivo selecionado
@@ -24,10 +35,22 @@ export default function HomePage() {
   // Estado que controla o carregamento do upload
   const [uploading, setUploading] = useState(false);
 
-  // Busca os clips ao carregar a página
+  // Busca vídeos e clips ao carregar a página
   useEffect(() => {
+    loadVideos();
     loadClips();
   }, []);
+
+  // Função que chama a API para listar vídeos
+  async function loadVideos() {
+    try {
+      const response = await fetch("/api/videos");
+      const data = await response.json();
+      setVideos(data.videos || []);
+    } catch (error) {
+      console.error("Erro ao carregar vídeos:", error);
+    }
+  }
 
   // Função que chama a API para listar clips
   async function loadClips() {
@@ -56,6 +79,9 @@ export default function HomePage() {
       });
 
       setFile(null);
+
+      // Atualiza a lista após upload
+      await loadVideos();
       await loadClips();
     } catch (error) {
       console.error("Erro ao enviar vídeo:", error);
@@ -66,8 +92,9 @@ export default function HomePage() {
 
   return (
     <main style={{ padding: 40, fontFamily: "Arial" }}>
-      <h1>up.ai — Upload e Clips Gerados</h1>
+      <h1>up.ai — Upload, Vídeos e Clips</h1>
 
+      {/* Área de upload */}
       <div style={{ marginTop: 30, marginBottom: 40 }}>
         <h2>Upload de Vídeo 🚀</h2>
 
@@ -87,7 +114,32 @@ export default function HomePage() {
         </button>
       </div>
 
-      <h2>Clips Gerados</h2>
+      {/* Lista de vídeos enviados */}
+      <h2>Vídeos Enviados</h2>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {videos.length === 0 && <p>Nenhum vídeo enviado ainda.</p>}
+
+        {videos.map((video) => (
+          <div
+            key={video.id}
+            style={{
+              border: "1px solid #ddd",
+              borderRadius: 12,
+              padding: 16,
+            }}
+          >
+            <strong>{video.original_file_name}</strong>
+
+            <p>
+              <strong>Status:</strong> {video.status}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      {/* Lista de clips gerados */}
+      <h2 style={{ marginTop: 40 }}>Clips Gerados</h2>
 
       <div
         style={{
@@ -122,7 +174,7 @@ export default function HomePage() {
             <video
               controls
               width={400}
-              src={clip.file_path}
+              src={`/api/files/clip/${clip.file_path.split("/").pop()}`}
               style={{
                 borderRadius: 8,
                 marginTop: 10,
@@ -130,7 +182,10 @@ export default function HomePage() {
             />
 
             <div style={{ marginTop: 10 }}>
-              <a href={clip.file_path} download>
+              <a
+                href={`/api/files/clip/${clip.file_path.split("/").pop()}`}
+                download
+              >
                 <button>Download Clip</button>
               </a>
             </div>
