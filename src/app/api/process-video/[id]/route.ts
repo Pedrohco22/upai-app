@@ -1,7 +1,7 @@
-// Importa conexão com PostgreSQL
+// Importa conexão PostgreSQL
 import { db } from "@/lib/db";
 
-// Força Node.js runtime
+// Força runtime Node.js
 export const runtime = "nodejs";
 
 // Rota POST para processar vídeo
@@ -10,10 +10,10 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    // Pega ID do vídeo pela URL
+    // Pega ID do vídeo
     const { id } = await params;
 
-    // Atualiza status no banco
+    // Atualiza status para processing
     await db.query(
       `
       UPDATE videos
@@ -23,27 +23,45 @@ export async function POST(
       ["processing", id],
     );
 
+    // Busca vídeo no banco
+    const result = await db.query(
+      `
+      SELECT *
+      FROM videos
+      WHERE id = $1
+      `,
+      [id],
+    );
+
+    // Pega vídeo encontrado
+    const video = result.rows[0];
+
+    // Se não encontrar
+    if (!video) {
+      return Response.json({ error: "Vídeo não encontrado" }, { status: 404 });
+    }
+
+    // Log do vídeo encontrado
+    console.log("Vídeo encontrado:", video);
+
+    // Atualiza status para done
     await db.query(
       `
-  UPDATE videos
-  SET status = $1
-  WHERE id = $2
-  `,
+      UPDATE videos
+      SET status = $1
+      WHERE id = $2
+      `,
       ["done", id],
     );
 
     // Retorna resposta
     return Response.json({
       success: true,
-      videoId: id,
-      message: "Processamento concluído",
+      video,
     });
   } catch (error) {
-    console.error("Erro ao iniciar processamento:", error);
+    console.error("Erro ao processar vídeo:", error);
 
-    return Response.json(
-      { error: "Erro ao iniciar processamento" },
-      { status: 500 },
-    );
+    return Response.json({ error: "Erro ao processar vídeo" }, { status: 500 });
   }
 }
