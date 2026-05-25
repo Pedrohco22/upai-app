@@ -1,6 +1,21 @@
 // Importa conexão PostgreSQL
 import { db } from "@/lib/db";
 
+// Importa exec para rodar FFmpeg
+import { exec } from "child_process";
+
+// Importa promisify
+import { promisify } from "util";
+
+// Importa path
+import path from "path";
+
+// Importa mkdir
+import { mkdir } from "fs/promises";
+
+// Converte exec para async/await
+const execAsync = promisify(exec);
+
 // Força runtime Node.js
 export const runtime = "nodejs";
 
@@ -44,6 +59,44 @@ export async function POST(
     // Log do vídeo encontrado
     console.log("Vídeo encontrado:", video);
 
+    // Atualiza status para extracting_audio
+    await db.query(
+      `
+      UPDATE videos
+      SET status = $1
+      WHERE id = $2
+      `,
+      ["extracting_audio", id],
+    );
+
+    // Pasta onde os áudios serão salvos
+    const audioDir = path.join(process.cwd(), "public", "uploads", "audio");
+
+    // Garante que a pasta existe
+    await mkdir(audioDir, { recursive: true });
+
+    // Caminho absoluto do vídeo
+    const inputVideo = path.join(
+      process.cwd(),
+      "public",
+      video.original_file_path,
+    );
+
+    // Nome do áudio
+    const audioFileName = `${video.id}.mp3`;
+
+    // Caminho final do áudio
+    const outputAudio = path.join(audioDir, audioFileName);
+
+    // Comando FFmpeg para extrair áudio
+    const command = `ffmpeg -y -i "${inputVideo}" -vn -acodec libmp3lame "${outputAudio}"`;
+
+    // Executa FFmpeg
+    await execAsync(command);
+
+    // Log do áudio extraído
+    console.log("Áudio extraído:", outputAudio);
+
     // Atualiza status para done
     await db.query(
       `
@@ -57,7 +110,9 @@ export async function POST(
     // Retorna resposta
     return Response.json({
       success: true,
-      video,
+      videoId: id,
+      audioPath: `/uploads/audio/${audioFileName}`,
+      absoluteAudioPath: outputAudio,
     });
   } catch (error) {
     console.error("Erro ao processar vídeo:", error);
