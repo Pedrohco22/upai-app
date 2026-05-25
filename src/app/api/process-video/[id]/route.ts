@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 // Rota POST para processar vídeo
 export async function POST(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     // Pega ID do vídeo pela URL
@@ -20,21 +20,30 @@ export async function POST(
       SET status = $1
       WHERE id = $2
       `,
-      ["processing", id]
+      ["processing", id],
+    );
+
+    await db.query(
+      `
+  UPDATE videos
+  SET status = $1
+  WHERE id = $2
+  `,
+      ["done", id],
     );
 
     // Retorna resposta
     return Response.json({
       success: true,
       videoId: id,
-      message: "Processamento iniciado",
+      message: "Processamento concluído",
     });
   } catch (error) {
     console.error("Erro ao iniciar processamento:", error);
 
     return Response.json(
       { error: "Erro ao iniciar processamento" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
