@@ -18,40 +18,77 @@ export default function HomePage() {
   // Estado que armazena os clips
   const [clips, setClips] = useState<Clip[]>([]);
 
+  // Estado que armazena o arquivo selecionado
+  const [file, setFile] = useState<File | null>(null);
+
+  // Estado que controla o carregamento do upload
+  const [uploading, setUploading] = useState(false);
+
   // Busca os clips ao carregar a página
   useEffect(() => {
     loadClips();
   }, []);
 
-  // Função que chama a API
+  // Função que chama a API para listar clips
   async function loadClips() {
     try {
-      // Faz requisição para listar clips
       const response = await fetch("/api/clips");
-
-      // Converte resposta em JSON
       const data = await response.json();
-
-      // Atualiza estado
       setClips(data.clips || []);
     } catch (error) {
-      // Mostra erro no console
       console.error("Erro ao carregar clips:", error);
     }
   }
 
-  // Renderização da tela
-  return (
-    <main
-      style={{
-        padding: 40,
-        fontFamily: "Arial",
-      }}
-    >
-      {/* Título */}
-      <h1>up.ai — Clips Gerados</h1>
+  // Função que envia o vídeo para a API de upload
+  async function uploadVideo() {
+    if (!file) return;
 
-      {/* Lista de clips */}
+    try {
+      setUploading(true);
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      setFile(null);
+      await loadClips();
+    } catch (error) {
+      console.error("Erro ao enviar vídeo:", error);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <main style={{ padding: 40, fontFamily: "Arial" }}>
+      <h1>up.ai — Upload e Clips Gerados</h1>
+
+      <div style={{ marginTop: 30, marginBottom: 40 }}>
+        <h2>Upload de Vídeo 🚀</h2>
+
+        <input
+          type="file"
+          accept="video/*"
+          onChange={(event) => {
+            setFile(event.target.files?.[0] || null);
+          }}
+        />
+
+        <br />
+        <br />
+
+        <button onClick={uploadVideo} disabled={!file || uploading}>
+          {uploading ? "Enviando..." : "Enviar vídeo"}
+        </button>
+      </div>
+
+      <h2>Clips Gerados</h2>
+
       <div
         style={{
           display: "flex",
@@ -60,12 +97,8 @@ export default function HomePage() {
           marginTop: 30,
         }}
       >
-        {/* Sem clips */}
-        {clips.length === 0 && (
-        <p>Nenhum clip gerado ainda.</p>
-        )}
-      
-        {/* Lista de clips */}
+        {clips.length === 0 && <p>Nenhum clip gerado ainda.</p>}
+
         {clips.map((clip) => (
           <div
             key={clip.id}
@@ -75,22 +108,17 @@ export default function HomePage() {
               padding: 20,
             }}
           >
-            {/* Título */}
-            <h2>{clip.title}</h2>
+            <h3>{clip.title}</h3>
 
-            {/* Tempo */}
             <p>
-              <strong>Início:</strong> {clip.start_time}s
-              {" | "}
+              <strong>Início:</strong> {clip.start_time}s {" | "}
               <strong>Fim:</strong> {clip.end_time}s
             </p>
 
-            {/* Motivo */}
             <p>
               <strong>Motivo:</strong> {clip.reason}
             </p>
 
-            {/* Player de vídeo */}
             <video
               controls
               width={400}
@@ -101,15 +129,9 @@ export default function HomePage() {
               }}
             />
 
-            {/* Botão download */}
             <div style={{ marginTop: 10 }}>
-              <a
-                href={clip.file_path}
-                download
-              >
-                <button>
-                  Download Clip
-                </button>
+              <a href={clip.file_path} download>
+                <button>Download Clip</button>
               </a>
             </div>
           </div>
