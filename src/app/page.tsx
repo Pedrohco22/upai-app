@@ -60,6 +60,12 @@ export default function HomePage() {
           marginTop: 30,
         }}
       >
+        {/* Sem clips */}
+        {clips.length === 0 && (
+        <p>Nenhum clip gerado ainda.</p>
+        )}
+      
+        {/* Lista de clips */}
         {clips.map((clip) => (
           <div
             key={clip.id}
@@ -71,11 +77,6 @@ export default function HomePage() {
           >
             {/* Título */}
             <h2>{clip.title}</h2>
-
-            {/* Sem clip*/}
-            {clips.length === 0 && (
-              <p>Nenhum clip gerado ainda.</p>
-            )}
 
             {/* Tempo */}
             <p>
