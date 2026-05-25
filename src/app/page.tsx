@@ -72,6 +72,11 @@ export default function HomePage() {
             {/* Título */}
             <h2>{clip.title}</h2>
 
+            {/* Sem clip*/}
+            {clips.length === 0 && (
+              <p>Nenhum clip gerado ainda.</p>
+            )}
+
             {/* Tempo */}
             <p>
               <strong>Início:</strong> {clip.start_time}s
