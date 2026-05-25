@@ -52,6 +52,16 @@ export default function HomePage() {
     }
   }
 
+  // Função para iniciar processamento de um vídeo
+async function processVideo(videoId: string) {
+  await fetch(`/api/process-video/${videoId}`, {
+    method: "POST",
+  });
+
+  await loadVideos();
+  await loadClips();
+}
+
   // Função que chama a API para listar clips
   async function loadClips() {
     try {
@@ -132,8 +142,15 @@ export default function HomePage() {
             <strong>{video.original_file_name}</strong>
 
             <p>
-              <strong>Status:</strong> {video.status}
-            </p>
+  <strong>Status:</strong> {video.status}
+</p>
+
+<button
+  onClick={() => processVideo(video.id)}
+  style={{ marginTop: 10 }}
+>
+  Processar Vídeo
+</button>
           </div>
         ))}
       </div>
