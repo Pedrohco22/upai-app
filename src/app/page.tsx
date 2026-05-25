@@ -54,12 +54,22 @@ export default function HomePage() {
 
   // Função para iniciar processamento de um vídeo
 async function processVideo(videoId: string) {
-  await fetch(`/api/process-video/${videoId}`, {
-    method: "POST",
-  });
+  try {
+    console.log("Processando vídeo:", videoId);
 
-  await loadVideos();
-  await loadClips();
+    const response = await fetch(`/api/process-video/${videoId}`, {
+      method: "POST",
+    });
+
+    const data = await response.json();
+
+    console.log("Resposta processamento:", data);
+
+    await loadVideos();
+    await loadClips();
+  } catch (error) {
+    console.error("Erro ao processar vídeo:", error);
+  }
 }
 
   // Função que chama a API para listar clips
@@ -146,6 +156,7 @@ async function processVideo(videoId: string) {
 </p>
 
 <button
+  type="button"
   onClick={() => processVideo(video.id)}
   style={{ marginTop: 10 }}
 >
