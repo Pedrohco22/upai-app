@@ -1,26 +1,16 @@
-// Importa NextResponse
 import { NextResponse } from "next/server";
-
-// Importa path
 import path from "path";
-
-// Importa fs
 import fs from "fs";
 
-// Rota GET
+export const runtime = "nodejs";
+
 export async function GET(
   request: Request,
-  context: {
-    params: {
-      fileName: string;
-    };
-  }
+  { params }: { params: Promise<{ fileName: string }> }
 ) {
   try {
-    // Pega nome do arquivo da URL
-    const fileName = context.params.fileName;
+    const { fileName } = await params;
 
-    // Caminho absoluto do clip
     const filePath = path.join(
       process.cwd(),
       "public",
@@ -29,7 +19,6 @@ export async function GET(
       fileName
     );
 
-    // Verifica se arquivo existe
     if (!fs.existsSync(filePath)) {
       return NextResponse.json(
         { error: "Arquivo não encontrado" },
@@ -37,17 +26,16 @@ export async function GET(
       );
     }
 
-    // Lê arquivo
     const fileBuffer = fs.readFileSync(filePath);
 
-    // Retorna vídeo
     return new NextResponse(fileBuffer, {
       headers: {
         "Content-Type": "video/mp4",
+        "Content-Disposition": `inline; filename="${fileName}"`,
       },
     });
   } catch (error) {
-    console.error(error);
+    console.error("Erro ao carregar clip:", error);
 
     return NextResponse.json(
       { error: "Erro ao carregar arquivo" },
