@@ -35,7 +35,7 @@ export async function POST(request: Request) {
     const duration = end - start;
 
     // Define a pasta onde os cortes serão salvos
-    const clipsDir = path.join(process.cwd(), "public", "clips");
+    const clipsDir = path.join(process.cwd(), "public", "uploads", "clips");
 
     // Garante que a pasta de cortes existe
     await mkdir(clipsDir, { recursive: true });
@@ -73,7 +73,7 @@ const result = await db.query(
   [
     videoId,
     title,
-    `/clips/${clipName}`,
+    `/uploads/clips/${clipName}`,
     start,
     end,
     duration,
