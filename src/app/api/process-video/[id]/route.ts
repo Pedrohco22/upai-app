@@ -116,7 +116,7 @@ export async function POST(
     const formData = new FormData();
 
     // Adiciona arquivo de áudio
-    formData.append("file", audioBlob, audioFileName);
+    formData.append("audio_file", audioBlob, audioFileName);
 
     // Cria controller para timeout manual
     const controller = new AbortController();
@@ -127,15 +127,18 @@ export async function POST(
     }, 600000);
 
     // Envia áudio para Whisper API
-    const whisperResponse = await fetch("http://whisper-api:9000/transcribe", {
-      method: "POST",
-      body: formData,
-      signal: controller.signal,
+    const whisperResponse = await fetch(
+      "http://whisper-api:9000/asr?task=transcribe&language=pt&output=json",
+      {
+        method: "POST",
+        body: formData,
+        signal: controller.signal,
 
-      // IMPORTANTE:
-      // evita timeout padrão do undici/node
-      duplex: "half",
-    } as RequestInit);
+        // IMPORTANTE:
+        // evita timeout padrão do undici/node
+        duplex: "half",
+      } as RequestInit,
+    );
 
     // Limpa timeout
     clearTimeout(timeoutId);

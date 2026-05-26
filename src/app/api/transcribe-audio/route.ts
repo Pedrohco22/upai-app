@@ -8,7 +8,8 @@ import path from "path";
 export const runtime = "nodejs";
 
 // URL interna da API Whisper na rede Docker
-const WHISPER_API_URL = "http://whisper-api:9000/transcribe";
+const WHISPER_API_URL =
+  "http://whisper-api:9000/asr?task=transcribe&language=pt&output=json";
 
 // Rota POST chamada pelo n8n para transcrever áudio
 export async function POST(request: Request) {
