@@ -7,6 +7,10 @@ services:
     # Constrói a imagem usando o Dockerfile do projeto
     build:
       context: .
+      # Passa variáveis de ambiente para o build do Next.js
+      args:
+        OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+        OPENROUTER_MODEL: ${OPENROUTER_MODEL}
 
     # Nome do container da aplicação
     container_name: upai-app
@@ -17,3 +21,52 @@ services:
     # Porta externa 3001 apontando para porta interna 3000 do Next.js
     ports:
       - "3001:3000"
+
+    # Variáveis de ambiente da aplicação
+    environment:
+      # Conexão com o banco PostgreSQL pela rede Docker compartilhada
+      DATABASE_URL: postgresql://upai_user:upai_password_123@upai-postgres:5432/upai_db
+      # Chave de autenticação da API OpenRouter
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      # Modelo de IA usado via OpenRouter
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL}
+
+    # Volume para salvar uploads na VPS
+    volumes:
+      - upai_uploads:/app/public/uploads
+
+    # Conecta app na mesma rede do banco
+    networks:
+      - upai-network
+
+    # Aguarda o Whisper subir antes de iniciar a aplicação
+    depends_on:
+      - whisper-api
+
+  # Serviço de transcrição de áudio via Whisper
+  whisper-api:
+    # Imagem do Whisper compatível com a API REST
+    image: onerahmet/openai-whisper-asr-webservice:latest
+
+    # Nome do container do Whisper
+    container_name: whisper-api
+
+    # Reinicia automaticamente se cair
+    restart: always
+
+    # Modelo de transcrição (tiny=rápido, base=equilibrado, small/medium=preciso)
+    environment:
+      - ASR_MODEL=base
+
+    # Conecta Whisper na mesma rede da aplicação
+    networks:
+      - upai-network
+
+volumes:
+  # Volume persistente dos uploads
+  upai_uploads:
+
+networks:
+  # Rede compartilhada da up.ai
+  upai-network:
+    external: true

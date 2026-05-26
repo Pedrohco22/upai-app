@@ -38,6 +38,18 @@ RUN npm install
 COPY . .
 
 # =====================================================
+# VARIÁVEIS DE AMBIENTE DO BUILD
+# =====================================================
+
+# Recebe as variáveis passadas pelo docker-compose no momento do build
+ARG OPENROUTER_API_KEY
+ARG OPENROUTER_MODEL
+
+# Expõe as variáveis para o Next.js durante o build
+ENV OPENROUTER_API_KEY=$OPENROUTER_API_KEY
+ENV OPENROUTER_MODEL=$OPENROUTER_MODEL
+
+# =====================================================
 # BUILD DO NEXT.JS
 # =====================================================
 
