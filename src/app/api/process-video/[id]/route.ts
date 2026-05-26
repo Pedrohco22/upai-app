@@ -179,6 +179,69 @@ export async function POST(
     // Mostra resposta da IA no log do container
     console.log("Resposta da IA:", aiOutput);
 
+    // Garante que a resposta da IA existe antes de tratar como texto
+    if (!aiOutput) {
+      throw new Error("A IA não retornou nenhuma resposta");
+    }
+
+    // Converte resposta da IA para JSON
+    const cleanedOutput = aiOutput
+      .replace(/```json/g, "")
+      .replace(/```/g, "")
+      .trim();
+
+    const parsedAiOutput = JSON.parse(cleanedOutput);
+
+    // Lista de clips retornados pela IA
+    const clips = parsedAiOutput.clips;
+
+    // Pasta onde os clips serão salvos
+    const clipsDir = path.join(process.cwd(), "public", "uploads", "clips");
+
+    // Garante que a pasta existe
+    await mkdir(clipsDir, { recursive: true });
+
+    // Array para guardar clips gerados
+    const generatedClips = [];
+
+    // Percorre todos os clips sugeridos pela IA
+    for (let index = 0; index < clips.length; index++) {
+      // Dados do clip atual
+      const clip = clips[index];
+
+      // Nome do arquivo do clip
+      const clipFileName = `${video.id}-clip-${index + 1}.mp4`;
+
+      // Caminho final do clip
+      const clipOutputPath = path.join(clipsDir, clipFileName);
+
+      // Duração do clip
+      const duration = clip.end - clip.start;
+
+      // Comando FFmpeg para cortar vídeo
+      const clipCommand = `
+    ffmpeg -y \
+    -ss ${clip.start} \
+    -i "${inputVideo}" \
+    -t ${duration} \
+    -c:v libx264 \
+    -c:a aac \
+    "${clipOutputPath}"
+  `;
+
+      // Executa FFmpeg
+      await execAsync(clipCommand);
+
+      // Adiciona clip gerado na lista
+      generatedClips.push({
+        title: clip.title,
+        reason: clip.reason,
+        start: clip.start,
+        end: clip.end,
+        path: `/uploads/clips/${clipFileName}`,
+      });
+    }
+
     // Atualiza status para done temporariamente
     await db.query(
       `
@@ -193,10 +256,8 @@ export async function POST(
     return Response.json({
       success: true,
       videoId: id,
-      audioPath: `/uploads/audio/${audioFileName}`,
-      absoluteAudioPath: outputAudio,
       transcription,
-      aiOutput,
+      clips: generatedClips,
     });
   } catch (error) {
     // Mostra erro no log do container
