@@ -107,22 +107,33 @@ export async function POST(
     // Lê o áudio gerado
     const audioBuffer = await readFile(outputAudio);
 
-    // Cria um Blob com o áudio MP3
-    const audioBlob = new Blob([audioBuffer], {
+    const audioBlob = new Blob([new Uint8Array(audioBuffer)], {
       type: "audio/mpeg",
     });
 
-    // Cria FormData para enviar ao Whisper
     const formData = new FormData();
 
-    // Adiciona áudio no campo esperado pela API Whisper
     formData.append("file", audioBlob, audioFileName);
 
-    // Envia áudio para o Whisper
+    // Cria controle de timeout para o Whisper
+    const controller = new AbortController();
+
+    // Define timeout de 10 minutos
+    const timeout = setTimeout(
+      () => {
+        controller.abort();
+      },
+      10 * 60 * 1000,
+    );
+
     const whisperResponse = await fetch("http://whisper-api:8000/transcribe", {
       method: "POST",
       body: formData,
+      signal: controller.signal,
     });
+
+    // Limpa timeout após resposta do Whisper
+    clearTimeout(timeout);
 
     // Se Whisper falhar, lança erro
     if (!whisperResponse.ok) {
