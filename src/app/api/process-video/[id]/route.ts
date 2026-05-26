@@ -127,7 +127,7 @@ export async function POST(
     }, 600000);
 
     // Envia áudio para Whisper API
-    const whisperResponse = await fetch("http://whisper-api:8000/transcribe", {
+    const whisperResponse = await fetch("http://whisper-api:9000/transcribe", {
       method: "POST",
       body: formData,
       signal: controller.signal,
