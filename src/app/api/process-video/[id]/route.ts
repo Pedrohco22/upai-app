@@ -1,3 +1,6 @@
+// Importa função de análise da IA
+import { analyzeTranscript } from "@/lib/ai";
+
 // Importa conexão PostgreSQL
 import { db } from "@/lib/db";
 
@@ -51,7 +54,7 @@ export async function POST(
     // Pega vídeo encontrado
     const video = result.rows[0];
 
-    // Se não encontrar
+    // Se não encontrar vídeo, retorna erro
     if (!video) {
       return Response.json({ error: "Vídeo não encontrado" }, { status: 404 });
     }
@@ -66,29 +69,29 @@ export async function POST(
       ["extracting_audio", id],
     );
 
-    // Pasta onde os áudios serão salvos
+    // Define pasta onde os áudios serão salvos
     const audioDir = path.join(process.cwd(), "public", "uploads", "audio");
 
     // Garante que a pasta existe
     await mkdir(audioDir, { recursive: true });
 
-    // Caminho absoluto do vídeo
+    // Monta caminho absoluto do vídeo original
     const inputVideo = path.join(
       process.cwd(),
       "public",
       video.original_file_path,
     );
 
-    // Nome do áudio
+    // Define nome do áudio
     const audioFileName = `${video.id}.mp3`;
 
-    // Caminho final do áudio
+    // Monta caminho absoluto do áudio final
     const outputAudio = path.join(audioDir, audioFileName);
 
-    // Comando FFmpeg para extrair áudio
+    // Comando FFmpeg para extrair áudio do vídeo
     const command = `ffmpeg -y -i "${inputVideo}" -vn -acodec libmp3lame "${outputAudio}"`;
 
-    // Executa FFmpeg
+    // Executa o FFmpeg
     await execAsync(command);
 
     // Atualiza status para transcribing
@@ -101,18 +104,18 @@ export async function POST(
       ["transcribing", id],
     );
 
-    // Lê o arquivo de áudio gerado
+    // Lê o áudio gerado
     const audioBuffer = await readFile(outputAudio);
 
-    // Cria um Blob com o áudio em MP3
+    // Cria um Blob com o áudio MP3
     const audioBlob = new Blob([audioBuffer], {
       type: "audio/mpeg",
     });
 
-    // Cria formulário para enviar ao Whisper
+    // Cria FormData para enviar ao Whisper
     const formData = new FormData();
 
-    // Adiciona o arquivo no campo esperado pela API Whisper
+    // Adiciona áudio no campo esperado pela API Whisper
     formData.append("file", audioBlob, audioFileName);
 
     // Envia áudio para o Whisper
@@ -121,7 +124,7 @@ export async function POST(
       body: formData,
     });
 
-    // Se o Whisper falhar, lança erro
+    // Se Whisper falhar, lança erro
     if (!whisperResponse.ok) {
       const errorText = await whisperResponse.text();
       throw new Error(`Erro no Whisper: ${errorText}`);
@@ -141,17 +144,46 @@ export async function POST(
       ["transcribed", transcription.text, id],
     );
 
-    // Retorna resposta
+    // Atualiza status para analyzing
+    await db.query(
+      `
+      UPDATE videos
+      SET status = $1
+      WHERE id = $2
+      `,
+      ["analyzing", id],
+    );
+
+    // Envia transcrição para IA escolher os melhores cortes
+    const aiOutput = await analyzeTranscript(transcription.text);
+
+    // Mostra resposta da IA no log do container
+    console.log("Resposta da IA:", aiOutput);
+
+    // Atualiza status para done temporariamente
+    await db.query(
+      `
+      UPDATE videos
+      SET status = $1
+      WHERE id = $2
+      `,
+      ["done", id],
+    );
+
+    // Retorna resultado
     return Response.json({
       success: true,
       videoId: id,
       audioPath: `/uploads/audio/${audioFileName}`,
       absoluteAudioPath: outputAudio,
       transcription,
+      aiOutput,
     });
   } catch (error) {
+    // Mostra erro no log do container
     console.error("Erro ao processar vídeo:", error);
 
+    // Retorna erro para o frontend
     return Response.json({ error: "Erro ao processar vídeo" }, { status: 500 });
   }
 }
