@@ -204,6 +204,82 @@ export async function POST(
     // Array para guardar clips gerados
     const generatedClips = [];
 
+    // Percorre todos os clips retornados pela IA
+    for (let index = 0; index < clips.length; index++) {
+      // Pega o clip atual
+      const clip = clips[index];
+
+      // Nome final do arquivo do clip
+      const clipFileName = `${video.id}-clip-${index + 1}.mp4`;
+
+      // Caminho absoluto onde o clip será salvo
+      const clipOutputPath = path.join(clipsDir, clipFileName);
+
+      // Calcula duração do clip
+      const duration = clip.end - clip.start;
+
+      // Comando FFmpeg para cortar o trecho do vídeo
+      const clipCommand = `
+    ffmpeg -y \
+    -ss ${clip.start} \
+    -i "${inputVideo}" \
+    -t ${duration} \
+    -c:v libx264 \
+    -c:a aac \
+    "${clipOutputPath}"
+  `;
+
+      // Executa o FFmpeg
+      await execAsync(clipCommand);
+
+      // Salva informações do clip no banco de dados
+      await db.query(
+        `
+    INSERT INTO clips (
+      video_id,
+      title,
+      file_path,
+      start_time,
+      end_time,
+      duration,
+      reason
+    )
+    VALUES ($1, $2, $3, $4, $5, $6, $7)
+    `,
+        [
+          // ID do vídeo original
+          video.id,
+
+          // Título gerado pela IA
+          clip.title,
+
+          // Caminho do clip salvo
+          `/uploads/clips/${clipFileName}`,
+
+          // Tempo inicial do clip
+          clip.start,
+
+          // Tempo final do clip
+          clip.end,
+
+          // Duração total do clip
+          duration,
+
+          // Motivo escolhido pela IA
+          clip.reason,
+        ],
+      );
+
+      // Adiciona clip na lista que será retornada para o frontend
+      generatedClips.push({
+        title: clip.title,
+        reason: clip.reason,
+        start: clip.start,
+        end: clip.end,
+        path: `/uploads/clips/${clipFileName}`,
+      });
+    }
+
     // Percorre todos os clips sugeridos pela IA
     for (let index = 0; index < clips.length; index++) {
       // Dados do clip atual
