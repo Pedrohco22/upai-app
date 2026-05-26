@@ -23,15 +23,15 @@ export async function POST(request: Request) {
     if (!absoluteAudioPath) {
       return Response.json(
         { error: "absoluteAudioPath é obrigatório" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     // Lê o arquivo MP3 dentro do container upai-app
     const audioBuffer = await readFile(absoluteAudioPath);
 
-    // Cria um arquivo Blob para enviar ao Whisper
-    const audioBlob = new Blob([audioBuffer], {
+    // Cria um Blob com o áudio MP3
+    const audioBlob = new Blob([new Uint8Array(audioBuffer)], {
       type: "audio/mpeg",
     });
 
@@ -41,11 +41,27 @@ export async function POST(request: Request) {
     // Adiciona o áudio no campo esperado pela API Whisper: "file"
     formData.append("file", audioBlob, path.basename(absoluteAudioPath));
 
+    // Cria controlador para evitar timeout curto do fetch
+    const controller = new AbortController();
+
+    // Define timeout máximo de 10 minutos
+    const timeoutId = setTimeout(
+      () => {
+        controller.abort();
+      },
+      10 * 60 * 1000,
+    );
+
     // Envia o arquivo para a API Whisper
     const whisperResponse = await fetch(WHISPER_API_URL, {
       method: "POST",
       body: formData,
-    });
+      signal: controller.signal,
+      duplex: "half",
+    } as RequestInit);
+
+    // Limpa o timeout após receber resposta do Whisper
+    clearTimeout(timeoutId);
 
     // Se o Whisper retornar erro, repassa o erro
     if (!whisperResponse.ok) {
@@ -56,7 +72,7 @@ export async function POST(request: Request) {
           error: "Erro ao transcrever áudio",
           details: errorText,
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -73,7 +89,7 @@ export async function POST(request: Request) {
 
     return Response.json(
       { error: "Erro interno ao transcrever áudio" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
