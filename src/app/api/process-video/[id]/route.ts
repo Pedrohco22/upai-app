@@ -10,8 +10,8 @@ import { promisify } from "util";
 // Importa path
 import path from "path";
 
-// Importa mkdir
-import { mkdir } from "fs/promises";
+// Importa funções para criar pasta e ler arquivo
+import { mkdir, readFile } from "fs/promises";
 
 // Converte exec para async/await
 const execAsync = promisify(exec);
@@ -56,9 +56,6 @@ export async function POST(
       return Response.json({ error: "Vídeo não encontrado" }, { status: 404 });
     }
 
-    // Log do vídeo encontrado
-    console.log("Vídeo encontrado:", video);
-
     // Atualiza status para extracting_audio
     await db.query(
       `
@@ -94,17 +91,54 @@ export async function POST(
     // Executa FFmpeg
     await execAsync(command);
 
-    // Log do áudio extraído
-    console.log("Áudio extraído:", outputAudio);
-
-    // Atualiza status para done
+    // Atualiza status para transcribing
     await db.query(
       `
       UPDATE videos
       SET status = $1
       WHERE id = $2
       `,
-      ["done", id],
+      ["transcribing", id],
+    );
+
+    // Lê o arquivo de áudio gerado
+    const audioBuffer = await readFile(outputAudio);
+
+    // Cria um Blob com o áudio em MP3
+    const audioBlob = new Blob([audioBuffer], {
+      type: "audio/mpeg",
+    });
+
+    // Cria formulário para enviar ao Whisper
+    const formData = new FormData();
+
+    // Adiciona o arquivo no campo esperado pela API Whisper
+    formData.append("file", audioBlob, audioFileName);
+
+    // Envia áudio para o Whisper
+    const whisperResponse = await fetch("http://whisper-api:8000/transcribe", {
+      method: "POST",
+      body: formData,
+    });
+
+    // Se o Whisper falhar, lança erro
+    if (!whisperResponse.ok) {
+      const errorText = await whisperResponse.text();
+      throw new Error(`Erro no Whisper: ${errorText}`);
+    }
+
+    // Recebe transcrição do Whisper
+    const transcription = await whisperResponse.json();
+
+    // Salva transcrição no banco
+    await db.query(
+      `
+      UPDATE videos
+      SET status = $1,
+          transcription = $2
+      WHERE id = $3
+      `,
+      ["transcribed", transcription.text, id],
     );
 
     // Retorna resposta
@@ -113,6 +147,7 @@ export async function POST(
       videoId: id,
       audioPath: `/uploads/audio/${audioFileName}`,
       absoluteAudioPath: outputAudio,
+      transcription,
     });
   } catch (error) {
     console.error("Erro ao processar vídeo:", error);
