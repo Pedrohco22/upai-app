@@ -28,13 +28,20 @@ Nunca explique nada fora do JSON.
 `;
 
 // Função que analisa transcrição e retorna sugestões de clips
-export async function analyzeTranscript(transcription: string) {
+export async function analyzeTranscript(
+  transcription: string,
+  videoDuration: number,
+) {
   // Mensagem específica com a transcrição do vídeo
   const USER_PROMPT = `
 Analise esta transcrição e escolha os 3 melhores cortes virais.
 
 Regras:
-- Cada corte deve ter entre 15 e 60 segundos.
+- Cada corte deve ter exatamente 30 segundos.
+- O campo "end" deve ser sempre "start + 30".
+- A duração total do vídeo é ${videoDuration} segundos.
+- Nunca retorne "start" menor que 0.
+- Nunca retorne "end" maior que ${videoDuration}.
 - Retorne título, início, fim e motivo.
 - Use timestamps da transcrição.
 
@@ -45,7 +52,7 @@ Formato:
     {
       "title": "Título",
       "start": 10,
-      "end": 35,
+      "end": 40,
       "reason": "Motivo"
     }
   ]
