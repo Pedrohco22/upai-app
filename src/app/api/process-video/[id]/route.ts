@@ -173,8 +173,12 @@ export async function POST(
       ["analyzing", id],
     );
 
+    // Calcula a duração total do vídeo com base no último segmento da transcrição
+    const videoDuration =
+      transcription.segments?.[transcription.segments.length - 1]?.end || 0;
+
     // Envia transcrição para IA escolher os melhores cortes
-    const aiOutput = await analyzeTranscript(transcription.text);
+    const aiOutput = await analyzeTranscript(transcription.text, videoDuration);
 
     // Mostra resposta da IA no log do container
     console.log("Resposta da IA:", aiOutput);
@@ -190,6 +194,7 @@ export async function POST(
       .replace(/```/g, "")
       .trim();
 
+    // Faz parse do JSON retornado pela IA
     const parsedAiOutput = JSON.parse(cleanedOutput);
 
     // Lista de clips retornados pela IA
@@ -209,25 +214,30 @@ export async function POST(
       // Pega o clip atual
       const clip = clips[index];
 
+      // Calcula tempo de início e fim do clip
+      const start = Number(clip.start);
+      const duration = 30;
+      const end = start + duration;
+
+      // Ignora clips inválidos ou fora da duração do vídeo
+      if (
+        Number.isNaN(start) ||
+        start < 0 ||
+        end > videoDuration ||
+        duration <= 0
+      ) {
+        console.log("Clip inválido ignorado:", clip);
+        continue;
+      }
+
       // Nome final do arquivo do clip
       const clipFileName = `${video.id}-clip-${index + 1}.mp4`;
 
       // Caminho absoluto onde o clip será salvo
       const clipOutputPath = path.join(clipsDir, clipFileName);
 
-      // Calcula duração do clip
-      const duration = clip.end - clip.start;
-
       // Comando FFmpeg para cortar o trecho do vídeo
-      const clipCommand = `
-    ffmpeg -y \
-    -ss ${clip.start} \
-    -i "${inputVideo}" \
-    -t ${duration} \
-    -c:v libx264 \
-    -c:a aac \
-    "${clipOutputPath}"
-  `;
+      const clipCommand = `ffmpeg -y -ss ${start} -i "${inputVideo}" -t ${duration} -c:v libx264 -c:a aac "${clipOutputPath}"`;
 
       // Executa o FFmpeg
       await execAsync(clipCommand);
@@ -235,17 +245,17 @@ export async function POST(
       // Salva informações do clip no banco de dados
       await db.query(
         `
-    INSERT INTO clips (
-      video_id,
-      title,
-      file_path,
-      start_time,
-      end_time,
-      duration,
-      reason
-    )
-    VALUES ($1, $2, $3, $4, $5, $6, $7)
-    `,
+        INSERT INTO clips (
+          video_id,
+          title,
+          file_path,
+          start_time,
+          end_time,
+          duration,
+          reason
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        `,
         [
           // ID do vídeo original
           video.id,
@@ -257,10 +267,10 @@ export async function POST(
           `/uploads/clips/${clipFileName}`,
 
           // Tempo inicial do clip
-          clip.start,
+          start,
 
           // Tempo final do clip
-          clip.end,
+          end,
 
           // Duração total do clip
           duration,
@@ -274,51 +284,13 @@ export async function POST(
       generatedClips.push({
         title: clip.title,
         reason: clip.reason,
-        start: clip.start,
-        end: clip.end,
+        start,
+        end,
         path: `/uploads/clips/${clipFileName}`,
       });
     }
 
-    // Percorre todos os clips sugeridos pela IA
-    for (let index = 0; index < clips.length; index++) {
-      // Dados do clip atual
-      const clip = clips[index];
-
-      // Nome do arquivo do clip
-      const clipFileName = `${video.id}-clip-${index + 1}.mp4`;
-
-      // Caminho final do clip
-      const clipOutputPath = path.join(clipsDir, clipFileName);
-
-      // Duração do clip
-      const duration = clip.end - clip.start;
-
-      // Comando FFmpeg para cortar vídeo
-      const clipCommand = `
-    ffmpeg -y \
-    -ss ${clip.start} \
-    -i "${inputVideo}" \
-    -t ${duration} \
-    -c:v libx264 \
-    -c:a aac \
-    "${clipOutputPath}"
-  `;
-
-      // Executa FFmpeg
-      await execAsync(clipCommand);
-
-      // Adiciona clip gerado na lista
-      generatedClips.push({
-        title: clip.title,
-        reason: clip.reason,
-        start: clip.start,
-        end: clip.end,
-        path: `/uploads/clips/${clipFileName}`,
-      });
-    }
-
-    // Atualiza status para done temporariamente
+    // Atualiza status para done
     await db.query(
       `
       UPDATE videos
