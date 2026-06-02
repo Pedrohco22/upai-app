@@ -1,5 +1,8 @@
 "use client";
 
+// Importa tipos do React
+import type { CSSProperties, ReactNode } from "react";
+
 // Importa hooks do React
 import { useEffect, useState } from "react";
 
@@ -47,6 +50,9 @@ export default function HomePage() {
   // Lista de clips gerados
   const [clips, setClips] = useState<Clip[]>([]);
 
+  // Clip selecionado para abrir no modal
+  const [selectedClip, setSelectedClip] = useState<Clip | null>(null);
+
   // Arquivo selecionado para upload
   const [file, setFile] = useState<File | null>(null);
 
@@ -76,6 +82,13 @@ export default function HomePage() {
     const response = await fetch("/api/clips");
     const data = await response.json();
     setClips(data.clips || []);
+  }
+
+  // Retorna URL correta para reproduzir/baixar clip
+  function getClipUrl(filePath: string) {
+    const fileName = filePath.split("/").pop();
+
+    return `/api/files/clip/${fileName}`;
   }
 
   // Envia vídeo para o backend
@@ -125,6 +138,7 @@ export default function HomePage() {
           <div style={styles.logo}>
             <span style={styles.logoPurple}>up.</span>ai
           </div>
+
           <div style={styles.subtitle}>AI VIDEO STUDIO</div>
         </div>
 
@@ -144,12 +158,13 @@ export default function HomePage() {
 
       {/* Conteúdo principal */}
       <section style={styles.content}>
-        {/* Título */}
+        {/* Cabeçalho da página */}
         <div style={styles.hero}>
           <div>
             <h1 style={styles.title}>Vídeos</h1>
+
             <p style={styles.description}>
-              Envie seus vídeos longos e deixe a IA criar clips virais para o
+              Envie vídeos longos e deixe a IA criar clips virais para o
               YouTube.
             </p>
           </div>
@@ -191,12 +206,13 @@ export default function HomePage() {
           />
         </section>
 
-        {/* Layout inferior */}
+        {/* Grid principal */}
         <section style={styles.mainGrid}>
-          {/* Coluna esquerda: vídeos */}
+          {/* Painel de vídeos */}
           <div style={styles.panel}>
             <div style={styles.panelHeader}>
               <h2 style={styles.panelTitle}>Meus vídeos</h2>
+
               <span style={styles.link}>Mais recentes</span>
             </div>
 
@@ -214,7 +230,9 @@ export default function HomePage() {
 
                   <div style={styles.videoInfo}>
                     <strong>{video.original_file_name}</strong>
+
                     <span style={styles.mutedText}>Status: {video.status}</span>
+
                     <span style={styles.purpleText}>
                       {clips.length} clips gerados
                     </span>
@@ -227,7 +245,7 @@ export default function HomePage() {
                   >
                     {processingVideoId === video.id
                       ? "Processando..."
-                      : "Ver clips"}
+                      : "Processar"}
                   </button>
 
                   <MoreVertical size={18} color="#94A3B8" />
@@ -235,12 +253,13 @@ export default function HomePage() {
               ))}
             </div>
 
-            {/* Upload */}
+            {/* Área de upload */}
             <div style={styles.dropzone}>
               <Upload size={30} color="#8B5CF6" />
 
               <div>
                 <strong>Arraste e solte seu vídeo aqui</strong>
+
                 <p style={styles.mutedText}>MP4, MOV ou AVI</p>
               </div>
 
@@ -262,12 +281,13 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Coluna direita: clips */}
+          {/* Painel de clips */}
           <div style={styles.panel}>
             <div style={styles.panelHeader}>
               <h2 style={styles.panelTitle}>
                 Clips gerados <span style={styles.badge}>{clips.length}</span>
               </h2>
+
               <span style={styles.link}>Ver todos</span>
             </div>
 
@@ -278,15 +298,21 @@ export default function HomePage() {
               )}
 
               {clips.map((clip) => (
-                <div key={clip.id} style={styles.clipCard}>
+                <div
+                  key={clip.id}
+                  style={styles.clipCard}
+                  onClick={() => setSelectedClip(clip)}
+                >
                   <div style={styles.clipVideoBox}>
                     <video
                       controls
-                      src={clip.file_path}
+                      src={getClipUrl(clip.file_path)}
                       style={styles.clipVideo}
+                      onClick={(event) => event.stopPropagation()}
                     />
 
                     <span style={styles.durationBadge}>00:30</span>
+
                     <span style={styles.viralBadge}>Novo</span>
                   </div>
 
@@ -299,7 +325,11 @@ export default function HomePage() {
                       <Play size={16} />
                     </button>
 
-                    <a href={clip.file_path} download>
+                    <a
+                      href={getClipUrl(clip.file_path)}
+                      download
+                      onClick={(event) => event.stopPropagation()}
+                    >
                       <button style={styles.iconButton}>
                         <Download size={16} />
                       </button>
@@ -325,6 +355,7 @@ export default function HomePage() {
 
           <div>
             <strong>IA trabalhando para você</strong>
+
             <p style={styles.mutedText}>
               Transformamos conteúdo longo em clips curtos e impactantes prontos
               para o YouTube.
@@ -337,6 +368,89 @@ export default function HomePage() {
           </button>
         </section>
       </section>
+
+      {/* Modal do clip selecionado */}
+      {selectedClip && (
+        <div style={styles.modalOverlay} onClick={() => setSelectedClip(null)}>
+          <div
+            style={styles.modalContent}
+            onClick={(event) => event.stopPropagation()}
+          >
+            {/* Cabeçalho do modal */}
+            <div style={styles.modalHeader}>
+              <div>
+                <h2 style={styles.modalTitle}>{selectedClip.title}</h2>
+
+                <p style={styles.modalSubtitle}>
+                  Clip gerado automaticamente pela IA
+                </p>
+              </div>
+
+              <button
+                style={styles.closeButton}
+                onClick={() => setSelectedClip(null)}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Player grande */}
+            <div style={styles.modalVideoWrapper}>
+              <video
+                controls
+                autoPlay
+                src={getClipUrl(selectedClip.file_path)}
+                style={styles.modalVideo}
+              />
+            </div>
+
+            {/* Informações do clip */}
+            <div style={styles.modalInfo}>
+              <div style={styles.modalInfoCard}>
+                <strong>Duração</strong>
+                <span>30 segundos</span>
+              </div>
+
+              <div style={styles.modalInfoCard}>
+                <strong>Início</strong>
+                <span>{selectedClip.start_time}s</span>
+              </div>
+
+              <div style={styles.modalInfoCard}>
+                <strong>Fim</strong>
+                <span>{selectedClip.end_time}s</span>
+              </div>
+            </div>
+
+            {/* Explicação da IA */}
+            <div style={styles.reasonBox}>
+              <strong>Por que a IA escolheu esse trecho?</strong>
+
+              <p style={styles.reasonText}>{selectedClip.reason}</p>
+            </div>
+
+            {/* Ações do modal */}
+            <div style={styles.modalActions}>
+              <a href={getClipUrl(selectedClip.file_path)} download>
+                <button style={styles.primaryButton}>
+                  <Download size={18} />
+                  Download
+                </button>
+              </a>
+
+              <button style={styles.secondaryButton}>
+                <Calendar size={18} />
+                Agendar
+              </button>
+
+              <button style={styles.secondaryButton}>
+                <Tv size={18} />
+                Publicar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
@@ -348,7 +462,7 @@ function StatCard({
   value,
   detail,
 }: {
-  icon: React.ReactNode;
+  icon: ReactNode;
   label: string;
   value: number | string;
   detail: string;
@@ -359,7 +473,9 @@ function StatCard({
 
       <div>
         <strong style={styles.statValue}>{value}</strong>
+
         <p style={styles.statLabel}>{label}</p>
+
         <span style={styles.statDetail}>{detail}</span>
       </div>
     </div>
@@ -367,7 +483,7 @@ function StatCard({
 }
 
 // Estilos da página
-const styles: Record<string, React.CSSProperties> = {
+const styles: Record<string, CSSProperties> = {
   page: {
     minHeight: "100vh",
     background:
@@ -467,6 +583,9 @@ const styles: Record<string, React.CSSProperties> = {
   },
 
   primaryButton: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
     background: "linear-gradient(135deg, #7C3AED, #8B5CF6)",
     color: "#FFFFFF",
     border: "none",
@@ -626,6 +745,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: "1px solid rgba(148, 163, 184, 0.12)",
     borderRadius: 16,
     padding: 10,
+    cursor: "pointer",
   },
 
   clipVideoBox: {
@@ -711,5 +831,105 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: "space-between",
     alignItems: "center",
     gap: 16,
+  },
+
+  modalOverlay: {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(0,0,0,0.72)",
+    backdropFilter: "blur(8px)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 999,
+    padding: 24,
+  },
+
+  modalContent: {
+    width: "100%",
+    maxWidth: 980,
+    background: "#0F172A",
+    border: "1px solid rgba(148,163,184,0.12)",
+    borderRadius: 24,
+    padding: 24,
+    display: "flex",
+    flexDirection: "column",
+    gap: 20,
+    boxShadow: "0 25px 80px rgba(0,0,0,0.45)",
+  },
+
+  modalHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+
+  modalTitle: {
+    margin: 0,
+    fontSize: 28,
+  },
+
+  modalSubtitle: {
+    color: "#94A3B8",
+    marginTop: 6,
+  },
+
+  closeButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    border: "1px solid rgba(148,163,184,0.12)",
+    background: "rgba(15,23,42,0.9)",
+    color: "#FFFFFF",
+    cursor: "pointer",
+    fontSize: 18,
+  },
+
+  modalVideoWrapper: {
+    width: "100%",
+    borderRadius: 18,
+    overflow: "hidden",
+    background: "#020617",
+  },
+
+  modalVideo: {
+    width: "100%",
+    maxHeight: 560,
+    background: "#000000",
+  },
+
+  modalInfo: {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, 1fr)",
+    gap: 16,
+  },
+
+  modalInfoCard: {
+    background: "rgba(2,6,23,0.75)",
+    border: "1px solid rgba(148,163,184,0.12)",
+    borderRadius: 16,
+    padding: 18,
+    display: "flex",
+    flexDirection: "column",
+    gap: 8,
+  },
+
+  reasonBox: {
+    background: "rgba(124,58,237,0.08)",
+    border: "1px solid rgba(124,58,237,0.2)",
+    borderRadius: 18,
+    padding: 18,
+  },
+
+  reasonText: {
+    color: "#CBD5E1",
+    lineHeight: 1.7,
+    marginTop: 10,
+  },
+
+  modalActions: {
+    display: "flex",
+    gap: 14,
+    justifyContent: "flex-end",
   },
 };
