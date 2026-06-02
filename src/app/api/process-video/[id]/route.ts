@@ -242,6 +242,18 @@ export async function POST(
       // Executa o FFmpeg
       await execAsync(clipCommand);
 
+      // Nome final do arquivo da thumbnail
+      const thumbnailFileName = `${video.id}-clip-${index + 1}.jpg`;
+
+      // Caminho absoluto onde a thumbnail será salva
+      const thumbnailOutputPath = path.join(clipsDir, thumbnailFileName);
+
+      // Comando FFmpeg para gerar thumbnail no primeiro segundo do clip
+      const thumbnailCommand = `ffmpeg -y -ss 1 -i "${clipOutputPath}" -frames:v 1 "${thumbnailOutputPath}"`;
+
+      // Executa o FFmpeg para gerar thumbnail
+      await execAsync(thumbnailCommand);
+
       // Salva informações do clip no banco de dados
       await db.query(
         `
@@ -253,8 +265,9 @@ export async function POST(
           end_time,
           duration,
           reason
+          thumbnail_path
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         `,
         [
           // ID do vídeo original
@@ -264,8 +277,9 @@ export async function POST(
           clip.title,
 
           // Caminho do clip salvo
-          `/uploads/clips/${clipFileName}`,
+          `/uploads/clips/${thumbnailFileName}`,
 
+          ,
           // Tempo inicial do clip
           start,
 
@@ -286,7 +300,7 @@ export async function POST(
         reason: clip.reason,
         start,
         end,
-        path: `/uploads/clips/${clipFileName}`,
+        thumbnailPath: `/uploads/clips/${thumbnailFileName}`,
       });
     }
 
