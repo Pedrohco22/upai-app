@@ -54,6 +54,9 @@ export default function HomePage() {
   // Clip selecionado para abrir no modal
   const [selectedClip, setSelectedClip] = useState<Clip | null>(null);
 
+  // ID do clip que está com o mouse em cima
+  const [hoveredClipId, setHoveredClipId] = useState<string | null>(null);
+
   // Arquivo selecionado para upload
   const [file, setFile] = useState<File | null>(null);
 
@@ -340,10 +343,22 @@ export default function HomePage() {
                   key={clip.id}
                   style={styles.clipCard}
                   onClick={() => setSelectedClip(clip)}
+                  onMouseEnter={() => setHoveredClipId(clip.id)}
+                  onMouseLeave={() => setHoveredClipId(null)}
                 >
                   {/* Área da thumbnail do clip */}
                   <div style={styles.clipVideoBox}>
-                    {clip.thumbnail_path ? (
+                    {/* Mostra vídeo em preview quando passa o mouse */}
+                    {hoveredClipId === clip.id ? (
+                      <video
+                        src={getClipUrl(clip.file_path)}
+                        style={styles.clipThumbnail}
+                        muted
+                        autoPlay
+                        loop
+                        playsInline
+                      />
+                    ) : clip.thumbnail_path ? (
                       <img
                         src={getClipUrl(clip.thumbnail_path)}
                         alt={clip.title}
