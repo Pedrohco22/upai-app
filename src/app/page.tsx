@@ -1,5 +1,7 @@
 "use client";
 
+import { signIn } from "next-auth/react";
+
 // Importa tipos do React
 import type { CSSProperties, ReactNode } from "react";
 
@@ -192,6 +194,8 @@ export default function HomePage() {
           <span>Analytics</span>
           <span>Configurações</span>
         </nav>
+
+        <button onClick={() => signIn("google")}>Conectar YouTube</button>
 
         <button style={styles.uploadButton}>
           <Plus size={18} />
