@@ -36,6 +36,7 @@ type Clip = {
   id: string;
   title: string;
   file_path: string;
+  thumbnail_path?: string;
   start_time: number;
   end_time: number;
   duration?: number;
@@ -303,16 +304,23 @@ export default function HomePage() {
                   style={styles.clipCard}
                   onClick={() => setSelectedClip(clip)}
                 >
+                  {/* Área da thumbnail do clip */}
                   <div style={styles.clipVideoBox}>
-                    <video
-                      controls
-                      src={getClipUrl(clip.file_path)}
-                      style={styles.clipVideo}
-                      onClick={(event) => event.stopPropagation()}
+                    {/* Thumbnail gerada pelo FFmpeg */}
+                    <img
+                      src={
+                        clip.thumbnail_path
+                          ? getClipUrl(clip.thumbnail_path)
+                          : getClipUrl(clip.file_path)
+                      }
+                      alt={clip.title}
+                      style={styles.clipThumbnail}
                     />
 
+                    {/* Badge de duração fixa */}
                     <span style={styles.durationBadge}>00:30</span>
 
+                    {/* Badge visual do clip novo */}
                     <span style={styles.viralBadge}>Novo</span>
                   </div>
 
@@ -394,7 +402,7 @@ export default function HomePage() {
               </button>
             </div>
 
-            {/* Player grande */}
+            {/* Player grande do modal */}
             <div style={styles.modalVideoWrapper}>
               <video
                 controls
@@ -752,7 +760,7 @@ const styles: Record<string, CSSProperties> = {
     position: "relative",
   },
 
-  clipVideo: {
+  clipThumbnail: {
     width: "100%",
     height: 130,
     objectFit: "cover",
