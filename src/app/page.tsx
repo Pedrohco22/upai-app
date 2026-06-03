@@ -65,31 +65,67 @@ export default function HomePage() {
     null,
   );
 
-  // Carrega dados ao abrir a página
+  // Carrega vídeos e clips ao abrir a página
   useEffect(() => {
     loadVideos();
     loadClips();
   }, []);
 
-  // Busca vídeos enviados
+  // Busca vídeos enviados no backend
   async function loadVideos() {
     const response = await fetch("/api/videos");
     const data = await response.json();
+
     setVideos(data.videos || []);
   }
 
-  // Busca clips gerados
+  // Busca clips gerados no backend
   async function loadClips() {
     const response = await fetch("/api/clips");
     const data = await response.json();
-    setClips(data.clips || []);
+
+    // Normaliza os campos para evitar erro entre snake_case e camelCase
+    const normalizedClips = (data.clips || []).map((clip: any) => ({
+      id: clip.id,
+      title: clip.title || "Clip sem título",
+
+      // Caminho do vídeo do clip
+      file_path: clip.file_path || clip.path || "",
+
+      // Caminho da thumbnail gerada
+      thumbnail_path: clip.thumbnail_path || clip.thumbnailPath || "",
+
+      // Tempo inicial do clip
+      start_time: Number(clip.start_time ?? clip.start ?? 0),
+
+      // Tempo final do clip
+      end_time: Number(clip.end_time ?? clip.end ?? 0),
+
+      // Duração do clip
+      duration: Number(clip.duration ?? 30),
+
+      // Motivo da IA
+      reason:
+        typeof clip.reason === "string" && clip.reason.trim()
+          ? clip.reason
+          : "Sem motivo informado",
+    }));
+
+    setClips(normalizedClips);
   }
 
-  // Retorna URL correta para reproduzir/baixar clip
+  // Retorna URL correta para reproduzir/baixar clip ou thumbnail
   function getClipUrl(filePath: string) {
     const fileName = filePath.split("/").pop();
 
     return `/api/files/clip/${fileName}`;
+  }
+
+  // Formata segundos para exibição simples
+  function formatSeconds(value: number) {
+    if (!Number.isFinite(value)) return "0s";
+
+    return `${Math.round(value)}s`;
   }
 
   // Envia vídeo para o backend
@@ -100,6 +136,7 @@ export default function HomePage() {
       setUploading(true);
 
       const formData = new FormData();
+
       formData.append("file", file);
 
       await fetch("/api/upload", {
@@ -306,21 +343,20 @@ export default function HomePage() {
                 >
                   {/* Área da thumbnail do clip */}
                   <div style={styles.clipVideoBox}>
-                    {/* Thumbnail gerada pelo FFmpeg */}
-                    <img
-                      src={
-                        clip.thumbnail_path
-                          ? getClipUrl(clip.thumbnail_path)
-                          : getClipUrl(clip.file_path)
-                      }
-                      alt={clip.title}
-                      style={styles.clipThumbnail}
-                    />
+                    {clip.thumbnail_path ? (
+                      <img
+                        src={getClipUrl(clip.thumbnail_path)}
+                        alt={clip.title}
+                        style={styles.clipThumbnail}
+                      />
+                    ) : (
+                      <div style={styles.clipThumbnailFallback}>
+                        <Video size={26} />
+                      </div>
+                    )}
 
-                    {/* Badge de duração fixa */}
                     <span style={styles.durationBadge}>00:30</span>
 
-                    {/* Badge visual do clip novo */}
                     <span style={styles.viralBadge}>Novo</span>
                   </div>
 
@@ -329,7 +365,13 @@ export default function HomePage() {
                   <p style={styles.clipReason}>{clip.reason}</p>
 
                   <div style={styles.clipActions}>
-                    <button style={styles.iconButton}>
+                    <button
+                      style={styles.iconButton}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setSelectedClip(clip);
+                      }}
+                    >
                       <Play size={16} />
                     </button>
 
@@ -343,11 +385,17 @@ export default function HomePage() {
                       </button>
                     </a>
 
-                    <button style={styles.iconButton}>
+                    <button
+                      style={styles.iconButton}
+                      onClick={(event) => event.stopPropagation()}
+                    >
                       <Calendar size={16} />
                     </button>
 
-                    <button style={styles.iconButton}>
+                    <button
+                      style={styles.iconButton}
+                      onClick={(event) => event.stopPropagation()}
+                    >
                       <MoreVertical size={16} />
                     </button>
                   </div>
@@ -416,17 +464,22 @@ export default function HomePage() {
             <div style={styles.modalInfo}>
               <div style={styles.modalInfoCard}>
                 <strong>Duração</strong>
-                <span>30 segundos</span>
+                <span>
+                  {formatSeconds(
+                    selectedClip.duration ||
+                      selectedClip.end_time - selectedClip.start_time,
+                  )}
+                </span>
               </div>
 
               <div style={styles.modalInfoCard}>
                 <strong>Início</strong>
-                <span>{selectedClip.start_time}s</span>
+                <span>{formatSeconds(selectedClip.start_time)}</span>
               </div>
 
               <div style={styles.modalInfoCard}>
                 <strong>Fim</strong>
-                <span>{selectedClip.end_time}s</span>
+                <span>{formatSeconds(selectedClip.end_time)}</span>
               </div>
             </div>
 
@@ -744,7 +797,7 @@ const styles: Record<string, CSSProperties> = {
 
   clipsGrid: {
     display: "grid",
-    gridTemplateColumns: "repeat(4, 1fr)",
+    gridTemplateColumns: "repeat(3, 1fr)",
     gap: 16,
   },
 
@@ -766,6 +819,17 @@ const styles: Record<string, CSSProperties> = {
     objectFit: "cover",
     borderRadius: 12,
     background: "#020617",
+  },
+
+  clipThumbnailFallback: {
+    width: "100%",
+    height: 130,
+    borderRadius: 12,
+    background: "linear-gradient(135deg, #111827, #020617)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    color: "#8B5CF6",
   },
 
   durationBadge: {
