@@ -4,13 +4,13 @@ import { analyzeTranscript } from "@/lib/ai";
 // Importa conexão PostgreSQL
 import { db } from "@/lib/db";
 
-// Importa exec para rodar FFmpeg
+// Importa exec para rodar comandos FFmpeg
 import { exec } from "child_process";
 
-// Importa promisify
+// Importa promisify para usar exec com async/await
 import { promisify } from "util";
 
-// Importa path
+// Importa path para montar caminhos de arquivo
 import path from "path";
 
 // Importa funções para criar pasta e ler arquivo
@@ -28,7 +28,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    // Pega ID do vídeo
+    // Pega ID do vídeo pela URL
     const { id } = await params;
 
     // Atualiza status para processing
@@ -72,10 +72,10 @@ export async function POST(
     // Define pasta onde os áudios serão salvos
     const audioDir = path.join(process.cwd(), "public", "uploads", "audio");
 
-    // Garante que a pasta existe
+    // Garante que a pasta de áudio existe
     await mkdir(audioDir, { recursive: true });
 
-    // Monta caminho absoluto do vídeo original
+    // Monta caminho absoluto do vídeo original dentro do container
     const inputVideo = path.join(
       process.cwd(),
       "public",
@@ -89,10 +89,10 @@ export async function POST(
     const outputAudio = path.join(audioDir, audioFileName);
 
     // Comando FFmpeg para extrair áudio do vídeo
-    const command = `ffmpeg -y -i "${inputVideo}" -vn -acodec libmp3lame "${outputAudio}"`;
+    const audioCommand = `ffmpeg -y -i "${inputVideo}" -vn -acodec libmp3lame "${outputAudio}"`;
 
-    // Executa o FFmpeg
-    await execAsync(command);
+    // Executa o FFmpeg para extrair o áudio
+    await execAsync(audioCommand);
 
     // Atualiza status para transcribing
     await db.query(
@@ -115,18 +115,21 @@ export async function POST(
     // Cria FormData para enviar ao Whisper
     const formData = new FormData();
 
-    // Adiciona arquivo de áudio
+    // Adiciona arquivo de áudio no campo esperado pela API Whisper
     formData.append("audio_file", audioBlob, audioFileName);
 
     // Cria controller para timeout manual
     const controller = new AbortController();
 
-    // Timeout de 10 minutos
-    const timeoutId = setTimeout(() => {
-      controller.abort();
-    }, 600000);
+    // Define timeout de 10 minutos
+    const timeoutId = setTimeout(
+      () => {
+        controller.abort();
+      },
+      10 * 60 * 1000,
+    );
 
-    // Envia áudio para Whisper API
+    // Envia áudio para a API Whisper
     const whisperResponse = await fetch(
       "http://whisper-api:9000/asr?task=transcribe&language=pt&output=json",
       {
@@ -134,18 +137,18 @@ export async function POST(
         body: formData,
         signal: controller.signal,
 
-        // IMPORTANTE:
-        // evita timeout padrão do undici/node
+        // Evita problemas de streaming no Node/Undici
         duplex: "half",
       } as RequestInit,
     );
 
-    // Limpa timeout
+    // Limpa timeout após resposta da API Whisper
     clearTimeout(timeoutId);
 
     // Se Whisper falhar, lança erro
     if (!whisperResponse.ok) {
       const errorText = await whisperResponse.text();
+
       throw new Error(`Erro no Whisper: ${errorText}`);
     }
 
@@ -173,7 +176,7 @@ export async function POST(
       ["analyzing", id],
     );
 
-    // Calcula a duração total do vídeo com base no último segmento da transcrição
+    // Calcula duração total do vídeo com base no último segmento da transcrição
     const videoDuration =
       transcription.segments?.[transcription.segments.length - 1]?.end || 0;
 
@@ -183,27 +186,27 @@ export async function POST(
     // Mostra resposta da IA no log do container
     console.log("Resposta da IA:", aiOutput);
 
-    // Garante que a resposta da IA existe antes de tratar como texto
+    // Garante que a IA retornou alguma resposta
     if (!aiOutput) {
       throw new Error("A IA não retornou nenhuma resposta");
     }
 
-    // Converte resposta da IA para JSON
+    // Remove markdown ```json da resposta da IA
     const cleanedOutput = aiOutput
       .replace(/```json/g, "")
       .replace(/```/g, "")
       .trim();
 
-    // Faz parse do JSON retornado pela IA
+    // Converte resposta da IA em JSON
     const parsedAiOutput = JSON.parse(cleanedOutput);
 
     // Lista de clips retornados pela IA
-    const clips = parsedAiOutput.clips;
+    const clips = parsedAiOutput.clips || [];
 
-    // Pasta onde os clips serão salvos
+    // Define pasta onde os clips e thumbnails serão salvos
     const clipsDir = path.join(process.cwd(), "public", "uploads", "clips");
 
-    // Garante que a pasta existe
+    // Garante que a pasta de clips existe
     await mkdir(clipsDir, { recursive: true });
 
     // Array para guardar clips gerados
@@ -214,18 +217,17 @@ export async function POST(
       // Pega o clip atual
       const clip = clips[index];
 
-      // Calcula tempo de início e fim do clip
+      // Converte o início retornado pela IA para número
       const start = Number(clip.start);
+
+      // Define duração fixa de 30 segundos
       const duration = 30;
+
+      // Calcula o fim automaticamente
       const end = start + duration;
 
       // Ignora clips inválidos ou fora da duração do vídeo
-      if (
-        Number.isNaN(start) ||
-        start < 0 ||
-        end > videoDuration ||
-        duration <= 0
-      ) {
+      if (Number.isNaN(start) || start < 0 || end > videoDuration) {
         console.log("Clip inválido ignorado:", clip);
         continue;
       }
@@ -236,10 +238,10 @@ export async function POST(
       // Caminho absoluto onde o clip será salvo
       const clipOutputPath = path.join(clipsDir, clipFileName);
 
-      // Comando FFmpeg para cortar o trecho do vídeo
+      // Comando FFmpeg para cortar exatamente 30 segundos do vídeo
       const clipCommand = `ffmpeg -y -ss ${start} -i "${inputVideo}" -t ${duration} -c:v libx264 -c:a aac "${clipOutputPath}"`;
 
-      // Executa o FFmpeg
+      // Executa FFmpeg para gerar o clip
       await execAsync(clipCommand);
 
       // Nome final do arquivo da thumbnail
@@ -248,10 +250,10 @@ export async function POST(
       // Caminho absoluto onde a thumbnail será salva
       const thumbnailOutputPath = path.join(clipsDir, thumbnailFileName);
 
-      // Comando FFmpeg para gerar thumbnail no primeiro segundo do clip
-      const thumbnailCommand = `ffmpeg -y -ss 1 -i "${clipOutputPath}" -frames:v 1 "${thumbnailOutputPath}"`;
+      // Comando FFmpeg para gerar thumbnail aos 5 segundos do clip
+      const thumbnailCommand = `ffmpeg -y -i "${clipOutputPath}" -ss 00:00:05 -vframes 1 "${thumbnailOutputPath}"`;
 
-      // Executa o FFmpeg para gerar thumbnail
+      // Executa FFmpeg para gerar a thumbnail
       await execAsync(thumbnailCommand);
 
       // Salva informações do clip no banco de dados
@@ -270,38 +272,45 @@ export async function POST(
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         `,
         [
-          // ID do vídeo original
+          // $1 - ID do vídeo original
           video.id,
 
-          // Título gerado pela IA
-          clip.title,
+          // $2 - Título gerado pela IA
+          clip.title || `Clip ${index + 1}`,
 
-          // Caminho do clip salvo
-          `/uploads/clips/${thumbnailFileName}`,
+          // $3 - Caminho público do vídeo cortado
+          `/uploads/clips/${clipFileName}`,
 
-          ,
-          // Tempo inicial do clip
+          // $4 - Tempo inicial do clip
           start,
 
-          // Tempo final do clip
+          // $5 - Tempo final do clip
           end,
 
-          // Duração total do clip
+          // $6 - Duração do clip
           duration,
 
-          // Motivo escolhido pela IA
-          clip.reason,
+          // $7 - Motivo escolhido pela IA
+          clip.reason || "Sem motivo informado",
+
+          // $8 - Caminho público da thumbnail
+          `/uploads/clips/${thumbnailFileName}`,
         ],
       );
 
       // Adiciona clip na lista que será retornada para o frontend
       generatedClips.push({
-        title: clip.title,
-        reason: clip.reason,
+        title: clip.title || `Clip ${index + 1}`,
+        reason: clip.reason || "Sem motivo informado",
         start,
         end,
+        duration,
+        path: `/uploads/clips/${clipFileName}`,
         thumbnailPath: `/uploads/clips/${thumbnailFileName}`,
       });
+
+      // Mostra sucesso no log
+      console.log("Clip gerado com sucesso:", clipFileName);
     }
 
     // Atualiza status para done
@@ -314,7 +323,7 @@ export async function POST(
       ["done", id],
     );
 
-    // Retorna resultado
+    // Retorna resultado para o frontend
     return Response.json({
       success: true,
       videoId: id,
