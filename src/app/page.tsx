@@ -28,6 +28,7 @@ type UploadedVideo = {
   original_file_name: string;
   original_file_path: string;
   status: string;
+  duration?: number;
   created_at?: string;
 };
 
@@ -124,11 +125,14 @@ export default function HomePage() {
     return `/api/files/clip/${fileName}`;
   }
 
-  // Formata segundos para exibição simples
-  function formatSeconds(value: number) {
-    if (!Number.isFinite(value)) return "0s";
+  // Converte segundos para mm:ss
+  function formatTime(seconds: number) {
+    if (!Number.isFinite(seconds)) return "00:00";
 
-    return `${Math.round(value)}s`;
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+
+    return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
   }
 
   // Envia vídeo para o backend
@@ -179,8 +183,6 @@ export default function HomePage() {
           <div style={styles.logo}>
             <span style={styles.logoPurple}>up.</span>ai
           </div>
-
-          <div style={styles.subtitle}>AI VIDEO STUDIO</div>
         </div>
 
         <nav style={styles.navLinks}>
@@ -379,6 +381,31 @@ export default function HomePage() {
 
                   <p style={styles.clipReason}>{clip.reason}</p>
 
+                  {/* Timeline do clip */}
+                  <div style={styles.timelineWrapper}>
+                    {/* Barra */}
+                    <div style={styles.timelineBar}>
+                      <div
+                        style={{
+                          ...styles.timelineProgress,
+
+                          // Calcula posição baseada em vídeo de 30min fictício
+                          left: `${(clip.start_time / 1800) * 100}%`,
+
+                          // Largura baseada na duração do clip
+                          width: `${((clip.end_time - clip.start_time) / 1800) * 100}%`,
+                        }}
+                      />
+                    </div>
+
+                    {/* Tempos */}
+                    <div style={styles.timelineLabels}>
+                      <span>{formatTime(clip.start_time)}</span>
+
+                      <span>{formatTime(clip.end_time)}</span>
+                    </div>
+                  </div>
+
                   <div style={styles.clipActions}>
                     <button
                       style={styles.iconButton}
@@ -480,7 +507,7 @@ export default function HomePage() {
               <div style={styles.modalInfoCard}>
                 <strong>Duração</strong>
                 <span>
-                  {formatSeconds(
+                  {formatTime(
                     selectedClip.duration ||
                       selectedClip.end_time - selectedClip.start_time,
                   )}
@@ -489,12 +516,12 @@ export default function HomePage() {
 
               <div style={styles.modalInfoCard}>
                 <strong>Início</strong>
-                <span>{formatSeconds(selectedClip.start_time)}</span>
+                <span>{formatTime(selectedClip.start_time)}</span>
               </div>
 
               <div style={styles.modalInfoCard}>
                 <strong>Fim</strong>
-                <span>{formatSeconds(selectedClip.end_time)}</span>
+                <span>{formatTime(selectedClip.end_time)}</span>
               </div>
             </div>
 
@@ -1018,5 +1045,34 @@ const styles: Record<string, CSSProperties> = {
     display: "flex",
     gap: 14,
     justifyContent: "flex-end",
+  },
+
+  timelineWrapper: {
+    marginTop: 12,
+  },
+
+  timelineBar: {
+    width: "100%",
+    height: 6,
+    borderRadius: 999,
+    background: "rgba(148,163,184,0.12)",
+    position: "relative",
+    overflow: "hidden",
+  },
+
+  timelineProgress: {
+    position: "absolute",
+    top: 0,
+    height: "100%",
+    borderRadius: 999,
+    background: "linear-gradient(90deg, #7C3AED, #A78BFA)",
+  },
+
+  timelineLabels: {
+    display: "flex",
+    justifyContent: "space-between",
+    marginTop: 6,
+    fontSize: 11,
+    color: "#94A3B8",
   },
 };
